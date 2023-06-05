@@ -1,5 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#[warn(clippy::unwrap_used, clippy::expect_used)]
+#[warn(
+    clippy::nursery,
+    clippy::style,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
 pub mod discord_rpc;
 pub mod system_tray;
 pub mod window;

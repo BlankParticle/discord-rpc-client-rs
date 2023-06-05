@@ -23,14 +23,14 @@ impl DiscordRPCClient {
         client_id: u64,
         reconnect_timeout: Duration,
         max_retry: Option<u32>,
-    ) -> Option<DiscordRPCClient> {
+    ) -> Option<Self> {
         let mut reconnect_trials = 0u32;
         loop {
-            let socket = Socket::connect(DiscordRPCClient::get_socket_path()).await;
+            let socket = Socket::connect(Self::get_socket_path()).await;
             match socket {
                 Ok(socket) => {
                     info!("Socket Connected");
-                    break Some(DiscordRPCClient {
+                    break Some(Self {
                         client_id,
                         socket,
                         handshake_complete: false,
@@ -63,11 +63,12 @@ impl DiscordRPCClient {
     fn get_socket_path() -> PathBuf {
         let socket_dir = env::var("XDG_RUNTIME_DIR")
             .or_else(|_| env::var("TMPDIR"))
-            .or_else(|_| match env::temp_dir().to_str() {
-                Some(path) => Ok(path.to_string()),
-                None => Err(()),
+            .or_else(|_| {
+                env::temp_dir()
+                    .to_str()
+                    .map_or(Err(()), |path| Ok(path.to_string()))
             })
-            .unwrap_or(String::from("/tmp"));
+            .unwrap_or_else(|_| String::from("/tmp"));
         PathBuf::from(socket_dir).join("discord-ipc-0")
     }
 
@@ -83,12 +84,12 @@ impl DiscordRPCClient {
         })
         .to_string();
         writer
-            .write_all(&DiscordRPCClient::encode_message(OpCodes::Handshake, send_payload).await?)
+            .write_all(&Self::encode_message(OpCodes::Handshake, send_payload).await?)
             .await?;
         let mut recv_byte = [0; 2048];
         let bytes_read = reader.read(&mut recv_byte).await?;
         let recv_payload: &mut Value =
-            &mut from_str(&DiscordRPCClient::decode_message(&recv_byte[..bytes_read]).await?)?;
+            &mut from_str(&Self::decode_message(&recv_byte[..bytes_read]).await?)?;
         let user: User = from_value(recv_payload["data"]["user"].take())?;
         self.handshake_complete = true;
         Ok(user)
@@ -106,11 +107,11 @@ impl DiscordRPCClient {
         })
         .to_string();
         writer
-            .write_all(&DiscordRPCClient::encode_message(OpCodes::Frame, send_payload).await?)
+            .write_all(&Self::encode_message(OpCodes::Frame, send_payload).await?)
             .await?;
         let mut recv_byte = [0; 2048];
         let bytes_read = reader.read(&mut recv_byte).await?;
-        let recv_payload = DiscordRPCClient::decode_message(&recv_byte[..bytes_read]).await?;
+        let recv_payload = Self::decode_message(&recv_byte[..bytes_read]).await?;
         println!("{recv_payload}");
         Ok(())
     }
@@ -118,7 +119,9 @@ impl DiscordRPCClient {
     async fn encode_message(opcode: OpCodes, payload: String) -> Result<Vec<u8>> {
         let mut encoded_bytes = Vec::new();
         encoded_bytes.write_u32_le(opcode as u32).await?;
-        encoded_bytes.write_u32_le(payload.len() as u32).await?;
+        encoded_bytes
+            .write_u32_le(u32::try_from(payload.len())?)
+            .await?;
         encoded_bytes.write_all(payload.as_bytes()).await?;
         Ok(encoded_bytes)
     }
