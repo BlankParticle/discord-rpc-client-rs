@@ -12,19 +12,13 @@ use uuid::Uuid;
 #[cfg(unix)]
 type Socket = tokio::net::UnixStream;
 
+#[derive(Default, Debug)]
 pub struct DiscordRPCClient {
     socket: Option<Socket>,
     pub handshake_done: bool,
 }
 
 impl DiscordRPCClient {
-    pub fn new() -> Self {
-        Self {
-            socket: None,
-            handshake_done: false,
-        }
-    }
-
     pub async fn try_connecting(
         &mut self,
         reconnect_timeout: Duration,
@@ -126,6 +120,7 @@ impl DiscordRPCClient {
             let mut recv_byte = [0; 2048];
             let bytes_read = reader.read(&mut recv_byte).await?;
             let recv_payload = Self::decode_message(&recv_byte[..bytes_read]).await?;
+            println!("{recv_payload}");
             Ok(recv_payload)
         } else {
             Err(Report::msg("Socket not Connected"))
@@ -168,42 +163,50 @@ pub struct User {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Activity {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamps: Option<ActivityTimestamps>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub assets: Option<ActivityAssets>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub party: Option<ActivityParty>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub state: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub details: String,
+    pub timestamps: ActivityTimestamps,
+    pub assets: ActivityAssets,
+    #[serde(skip_serializing_if = "Button::do_skip")]
+    pub buttons: Vec<Button>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct ActivityTimestamps {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub start: Option<u128>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end: Option<u128>,
+    #[serde(skip_serializing_if = "ActivityTimestamps::do_skip")]
+    pub start: u128,
+    #[serde(skip_serializing_if = "ActivityTimestamps::do_skip")]
+    pub end: u128,
+}
+
+impl ActivityTimestamps {
+    const fn do_skip(timestamp: &u128) -> bool {
+        *timestamp == 0
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct ActivityAssets {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub large_image: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub large_text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub small_image: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub small_text: Option<String>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub large_image: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub large_text: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub small_image: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub small_text: String,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub struct ActivityParty {
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    // pub id: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<(Option<u32>, Option<u32>)>,
+pub struct Button {
+    pub label: String,
+    pub url: String,
+}
+
+impl Button {
+    fn do_skip(vec: &Vec<Self>) -> bool {
+        vec.is_empty() || vec.len() > 2
+    }
 }

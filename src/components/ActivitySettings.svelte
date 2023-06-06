@@ -23,7 +23,7 @@
   </div>
   <div class="flex justify-between my-1">
     <span class="font-semibold mx-2px">Large Image Text:</span>
-    <input type="text" bind:value={activity.assets.large_image_key} />
+    <input type="text" bind:value={activity.assets.large_text} />
   </div>
   <div class="flex justify-between my-1">
     <span class="font-semibold mx-2px">Small Image URL:</span>
@@ -31,7 +31,7 @@
   </div>
   <div class="flex justify-between my-1">
     <span class="font-semibold mx-2px">Small Image Text:</span>
-    <input type="text" bind:value={activity.assets.small_image_key} />
+    <input type="text" bind:value={activity.assets.small_text} />
   </div>
   <div class="flex justify-between my-1">
     <span class="font-semibold mx-2px">Timestamp Start:</span>

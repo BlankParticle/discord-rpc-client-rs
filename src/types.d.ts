@@ -1,24 +1,22 @@
-declare type User = Partial<{
+declare type User = {
   id: string;
   avatar: string;
   username: string;
   discriminator: string;
-}>;
+};
 
-declare type Activity = Partial<{
+declare type Activity = {
   state: string;
   details: string;
-  timestamps: Partial<{
+  timestamps: {
     start: number;
     end: number;
-  }>;
-  assets: Partial<{
-    large_image: string;
-    large_image_key: string;
-    small_image: string;
-    small_image_key: string;
-  }>;
-  party: {
-    size?: [number, number];
   };
-}>;
+  assets: {
+    large_image: string;
+    large_text: string;
+    small_image: string;
+    small_text: string;
+  };
+  buttons: { label: string; url: string }[];
+};

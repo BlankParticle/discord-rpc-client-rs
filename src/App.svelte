@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { event, invoke } from "@tauri-apps/api";
-  // import UserPreview from "./components/UserPreview.svelte";
+  import { invoke } from "@tauri-apps/api";
   import ActivitySettings from "./components/ActivitySettings.svelte";
 
   let connected = true;
@@ -14,39 +13,42 @@
     assets: {
       large_image:
         "https://media.tenor.com/v1fqDQIZbW4AAAAC/konata-izumi-anime.gif",
-      large_image_key: "Yay!",
+      large_text: "Yay!",
+      small_image:
+        "https://i.gifer.com/origin/dc/dcd102532110a6fea1e33bcdb5d31f9a_w200.gif",
+      small_text: "I am the King Now",
     },
     timestamps: {
       start: Date.now(),
+      end: 0,
     },
+    buttons: [],
   };
   let clientId = "1113164486161997925";
 
   const setActivity = () => {
-    invoke("handshake", { clientId: clientId }).then(() => {
-      invoke("set_activity", { activity }).then(() => {
-        alert("Activity Set");
-      });
-    });
+    invoke("set_activity", { activity }).then(() => {});
   };
 </script>
 
 {#if !connected}
-  <h1>Trying to Connect...</h1>
+  <h1 class="text-center">Trying to Connect...</h1>
 {:else}
   <main class="flex items-center justify-center flex-col">
     <!-- <UserPreview bind:user bind:activity bind:activityName /> -->
+    <button
+      on:click={() => {
+        invoke("handshake", { clientId: clientId });
+      }}>handshake</button
+    >
     <ActivitySettings bind:activity bind:clientId />
     <div>
       <button
         on:click={setActivity}
-        class="my-2 outline-none border-none bg-emerald px-2 py-1 font-bold rounded-1"
+        class="m-2 flex px-4.5 py-3 cursor-pointer rounded-50px outline-none border-none bg-teal text-mantle font-semibold active:scale-85 active:bg-teal/80 transition-all-300"
       >
         Set Activity
       </button>
     </div>
   </main>
 {/if}
-
-<!-- <input type="text" bind:value={message} />
-<button on:click={setActivity}>Send</button> -->

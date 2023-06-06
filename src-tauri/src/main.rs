@@ -11,7 +11,6 @@ pub mod window;
 
 use color_eyre::Result;
 use discord_rpc::{Activity, DiscordRPCClient, User};
-use serde_json::from_str;
 use system_tray::{create_system_tray, handle_system_tray_event};
 use tokio::{sync::Mutex, time::Duration};
 use tracing::{error, Level};
@@ -72,36 +71,8 @@ async fn main() -> Result<()> {
     )?;
 
     tauri::Builder::default()
-        .setup(|app| {
-            create_system_tray(app)?;
-            // app.listen_global("set-activity", move |data| {
-            //     if let Some(payload) = data.payload() {
-            //         if let Ok(activity) = from_str::<Activity>(payload) {
-            //             tokio::task::block_in_place(|| {
-            //                 tauri::async_runtime::block_on(async {
-            //                     tx.send(activity).await.unwrap();
-            //                 })
-            //             });
-            //         } else {
-            //             println!("Error in data");
-            //         }
-            //     }
-            // });
-
-            // let handle = app.handle();
-            // tokio::spawn(async move {
-            //     let client =
-            //         DiscordRPCClient::new(1113164486161997925, Duration::from_secs(5), None).await;
-            //     if let Some(mut client) = client {
-            //         client
-            //             .handshake()
-            //             .await
-            //             .unwrap_or_else(|err| error!("Error {err}"));
-            //     }
-            // });
-            Ok(())
-        })
-        .manage(Mutex::new(DiscordRPCClient::new()))
+        .setup(create_system_tray)
+        .manage(Mutex::new(DiscordRPCClient::default()))
         .on_window_event(handle_window_event)
         .on_system_tray_event(handle_system_tray_event)
         .invoke_handler(tauri::generate_handler![

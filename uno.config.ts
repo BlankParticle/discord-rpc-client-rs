@@ -1,9 +1,10 @@
-import { defineConfig, presetUno } from "unocss";
+import { defineConfig, presetUno, transformerVariantGroup } from "unocss";
 
 export default defineConfig({
   presets: [presetUno()],
-  theme: {
-    colors: {
+  transformers: [transformerVariantGroup()],
+  extendTheme: (theme) => {
+    theme.colors = {
       rosewater: "#f5e0dc",
       flamingo: "#f2cdcd",
       pink: "#f5c2e7",
@@ -30,6 +31,7 @@ export default defineConfig({
       base: "#1e1e2e",
       mantle: "#181825",
       crust: "#11111b",
-    },
+    };
+    return theme;
   },
 });
