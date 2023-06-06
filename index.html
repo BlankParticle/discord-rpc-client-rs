@@ -2,13 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/tauri.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri + Svelte + TS</title>
+    <title>Discord RPC Client</title>
   </head>
-
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+  <body class="bg-base text-text">
+    <div id="app" class="contents"></div>
+    <script type="module">
+      import App from "./src/App.svelte";
+      import "uno.css";
+      import "@unocss/reset/sanitize/sanitize.css";
+      new App({
+        target: document.getElementById("app"),
+      });
+    </script>
   </body>
 </html>

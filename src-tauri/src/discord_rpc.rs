@@ -1,7 +1,7 @@
 use color_eyre::{Report, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, from_value, json, Value};
-use std::{env, io::Cursor, path::PathBuf};
+use std::{env, io::Cursor, path::PathBuf, process};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, ErrorKind, Interest},
     time::Duration,
@@ -13,28 +13,33 @@ use uuid::Uuid;
 type Socket = tokio::net::UnixStream;
 
 pub struct DiscordRPCClient {
-    client_id: u64,
-    socket: Socket,
-    handshake_complete: bool,
+    socket: Option<Socket>,
+    pub handshake_done: bool,
 }
 
 impl DiscordRPCClient {
-    pub async fn new(
-        client_id: u64,
+    pub fn new() -> Self {
+        Self {
+            socket: None,
+            handshake_done: false,
+        }
+    }
+
+    pub async fn try_connecting(
+        &mut self,
         reconnect_timeout: Duration,
         max_retry: Option<u32>,
-    ) -> Option<Self> {
+    ) -> Result<()> {
+        if self.socket.is_some() {
+            return Ok(());
+        }
         let mut reconnect_trials = 0u32;
-        loop {
+        self.socket = loop {
             let socket = Socket::connect(Self::get_socket_path()).await;
             match socket {
                 Ok(socket) => {
                     info!("Socket Connected");
-                    break Some(Self {
-                        client_id,
-                        socket,
-                        handshake_complete: false,
-                    });
+                    break Some(socket);
                 }
                 Err(err) => match err.kind() {
                     ErrorKind::ConnectionRefused | ErrorKind::NotFound => {
@@ -56,7 +61,8 @@ impl DiscordRPCClient {
                     }
                 },
             }
-        }
+        };
+        Ok(())
     }
 
     #[cfg(unix)]
@@ -72,48 +78,58 @@ impl DiscordRPCClient {
         PathBuf::from(socket_dir).join("discord-ipc-0")
     }
 
-    pub async fn handshake(&mut self) -> Result<User> {
-        self.socket
-            .ready(Interest::WRITABLE | Interest::READABLE)
-            .await?;
-        let (mut reader, mut writer) = self.socket.split();
-        let send_payload = json!({
-            "client_id":self.client_id.to_string(),
-            "v": 1,
-            "nonce":Uuid::new_v4().to_string()
-        })
-        .to_string();
-        writer
-            .write_all(&Self::encode_message(OpCodes::Handshake, send_payload).await?)
-            .await?;
-        let mut recv_byte = [0; 2048];
-        let bytes_read = reader.read(&mut recv_byte).await?;
-        let recv_payload: &mut Value =
-            &mut from_str(&Self::decode_message(&recv_byte[..bytes_read]).await?)?;
-        let user: User = from_value(recv_payload["data"]["user"].take())?;
-        self.handshake_complete = true;
-        Ok(user)
+    pub async fn handshake(&mut self, client_id: String) -> Result<User> {
+        if let Some(ref mut socket) = self.socket {
+            socket
+                .ready(Interest::WRITABLE | Interest::READABLE)
+                .await?;
+            let (mut reader, mut writer) = socket.split();
+            let send_payload = json!({
+                "client_id":client_id,
+                "v": 1,
+                "nonce":Uuid::new_v4().to_string()
+            })
+            .to_string();
+            writer
+                .write_all(&Self::encode_message(OpCodes::Handshake, send_payload).await?)
+                .await?;
+            let mut recv_byte = [0; 2048];
+            let bytes_read = reader.read(&mut recv_byte).await?;
+            let recv_payload: &mut Value =
+                &mut from_str(&Self::decode_message(&recv_byte[..bytes_read]).await?)?;
+            let user: User = from_value(recv_payload["data"]["user"].take())?;
+            self.handshake_done = true;
+            Ok(user)
+        } else {
+            Err(Report::msg("Socket Not Connected"))
+        }
     }
 
-    pub async fn set_activity(&mut self, activity: ActivityArgs) -> Result<()> {
-        if !self.handshake_complete {
+    pub async fn set_activity(&mut self, activity: Option<Activity>) -> Result<String> {
+        if !self.handshake_done {
             return Err(Report::msg("Handshake not completed"));
         }
-        let (mut reader, mut writer) = self.socket.split();
-        let send_payload = json!({
-            "cmd":"SET_ACTIVITY",
-            "args": activity,
-            "nonce": Uuid::new_v4().to_string()
-        })
-        .to_string();
-        writer
-            .write_all(&Self::encode_message(OpCodes::Frame, send_payload).await?)
-            .await?;
-        let mut recv_byte = [0; 2048];
-        let bytes_read = reader.read(&mut recv_byte).await?;
-        let recv_payload = Self::decode_message(&recv_byte[..bytes_read]).await?;
-        println!("{recv_payload}");
-        Ok(())
+        if let Some(ref mut socket) = self.socket {
+            let (mut reader, mut writer) = socket.split();
+            let send_payload = json!({
+                "cmd":"SET_ACTIVITY",
+                "args": {
+                    "pid": process::id(),
+                    "activity": activity
+                },
+                "nonce": Uuid::new_v4().to_string()
+            })
+            .to_string();
+            writer
+                .write_all(&Self::encode_message(OpCodes::Frame, send_payload).await?)
+                .await?;
+            let mut recv_byte = [0; 2048];
+            let bytes_read = reader.read(&mut recv_byte).await?;
+            let recv_payload = Self::decode_message(&recv_byte[..bytes_read]).await?;
+            Ok(recv_payload)
+        } else {
+            Err(Report::msg("Socket not Connected"))
+        }
     }
 
     async fn encode_message(opcode: OpCodes, payload: String) -> Result<Vec<u8>> {
@@ -148,13 +164,6 @@ pub struct User {
     discriminator: String,
     avatar: String,
     flags: u16,
-}
-
-#[derive(Default, Debug, Serialize, Deserialize)]
-pub struct ActivityArgs {
-    pub pid: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub activity: Option<Activity>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -193,8 +202,8 @@ pub struct ActivityAssets {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct ActivityParty {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<u32>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<(Option<u32>, Option<u32>)>,
 }
