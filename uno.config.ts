@@ -32,6 +32,9 @@ export default defineConfig({
       mantle: "#181825",
       crust: "#11111b",
     };
+    theme.fontFamily = {
+      sans: "'Open Sans', sans-serif",
+    };
     return theme;
   },
 });

@@ -45,7 +45,7 @@
     <div>
       <button
         on:click={setActivity}
-        class="m-2 flex px-4.5 py-3 cursor-pointer rounded-50px outline-none border-none bg-teal text-mantle font-semibold active:scale-85 active:bg-teal/80 transition-all-300"
+        class="m-2 flex px-4.5 py-3 cursor-pointer rounded-50px outline-none border-none bg-teal text-mantle font-sans font-bold active:scale-85 active:bg-teal/80 transition-all-300"
       >
         Set Activity
       </button>
